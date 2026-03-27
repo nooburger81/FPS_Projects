@@ -5,6 +5,8 @@
 
 #include "Attributes/BasicAttributeSet.h"
 #include "Components/CapsuleComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "FPS_Projects/GameplayAbilitySystem/FPSAbilitySystemComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 // Sets default values
@@ -14,7 +16,7 @@ AFPSCharacterBase::AFPSCharacterBase()
 	PrimaryActorTick.bCanEverTick = true;
 
 	// Create the Ability System Component
-	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent = CreateDefaultSubobject<UFPSAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(AscReplicationMode);
 
@@ -56,6 +58,7 @@ void AFPSCharacterBase::PossessedBy(AController* NewController)
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+		GrantAbilities(StartingAbilities);
 	}
 }
 
@@ -86,5 +89,46 @@ void AFPSCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 UAbilitySystemComponent* AFPSCharacterBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+TArray<FGameplayAbilitySpecHandle> AFPSCharacterBase::GrantAbilities(
+	TArray<TSubclassOf<UGameplayAbility>> AbilitiesToGrant)
+{
+	if (!AbilitySystemComponent)
+	{
+		return TArray<FGameplayAbilitySpecHandle>();
+	}
+	TArray<FGameplayAbilitySpecHandle> AbilityHandles;
+	for (TSubclassOf<UGameplayAbility> Ability : AbilitiesToGrant)
+	{
+		FGameplayAbilitySpecHandle SpecHandle = AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(Ability, 1, -1, this));
+		AbilityHandles.Add(SpecHandle);
+	}
+	SendAbilitiesChangedEvent();
+	return AbilityHandles;
+}
+
+void AFPSCharacterBase::RemoveAbilities(TArray<FGameplayAbilitySpecHandle> AbilityHandlesToRemove)
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	for (FGameplayAbilitySpecHandle AbilityHandle : AbilityHandlesToRemove)
+	{
+		AbilitySystemComponent->ClearAbility(AbilityHandle);
+	}
+	SendAbilitiesChangedEvent();
+}
+
+void AFPSCharacterBase::SendAbilitiesChangedEvent()
+{
+	FGameplayEventData EventData;
+	EventData.EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Abilities.Changed"));
+	EventData.Instigator = this;
+	EventData.Target = this;
+
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, EventData.EventTag, EventData);
 }
 
