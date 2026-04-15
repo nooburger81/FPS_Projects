@@ -43,6 +43,13 @@ void UBasicAttributeSet::PostGameplayEffectExecute(const struct FGameplayEffectM
 	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
 		SetHealth(GetHealth());
+
+		if (Data.EffectSpec.Def->GetAssetTags().HasTag(FGameplayTag::RequestGameplayTag("Effects.HitReaction")))
+		{
+			FGameplayTagContainer HitReactionTagContainer;
+			HitReactionTagContainer.AddTag(FGameplayTag::RequestGameplayTag("GameplayAbility.HitReaction"));
+			GetOwningAbilitySystemComponent()->TryActivateAbilitiesByTag(HitReactionTagContainer);
+		}
 	}
 	else if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
 	{
